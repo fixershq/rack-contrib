@@ -27,14 +27,16 @@ module Rack
       accept_langs = env["HTTP_ACCEPT_LANGUAGE"]
       return if accept_langs.nil?
 
-      languages_and_qvalues = accept_langs.split(",").map { |l|
+      ordered_preferences = accept_langs.split(",").map { |l|
         l += ';q=1.0' unless l =~ /;q=\d+(?:\.\d+)?$/
         l.split(';q=')
       }
 
-      language_and_qvalue = languages_and_qvalues.sort_by { |(locale, qvalue)|
-        qvalue.to_f
-      }.reverse.detect { |(locale, qvalue)|
+      ordered_preferences.sort_by! { |(locale, qvalue)| qvalue.to_f }
+      ordered_preferences.reverse!
+      ordered_preferences.map! { |(locale, _)| format_locale(locale) }
+
+      locale = ordered_preferences.detect { |locale|
         if I18n.enforce_available_locales
           locale == '*' || I18n.available_locales.include?(locale.to_sym)
         else
@@ -42,8 +44,17 @@ module Rack
         end
       }
 
-      lang = language_and_qvalue && language_and_qvalue.first
-      lang == '*' ? nil : lang
+      locale == '*' ? nil : locale
+    end
+
+    def format_locale(locale)
+      major, minor = locale.split("-")
+
+      if minor
+        [major, minor.upcase].join("-")
+      else
+        major
+      end
     end
   end
 end
